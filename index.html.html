@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Heladería Avanzada, Costos y Exportación (Pro)</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8; color: #2c3e50; margin: 0; padding: 20px; }
+        .container { max-width: 1300px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        h1, h2, h3 { color: #1a252f; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 30px; }
+        @media(max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #dfe6e9; padding: 12px; text-align: left; }
+        th { background-color: #2c3e50; color: white; }
+        select, input, button { padding: 10px; width: 100%; box-sizing: border-box; border: 1px solid #b2bec3; border-radius: 6px; font-size: 14px; }
+        
+        button { background-color: #2ecc71; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #27ae60; }
+        .btn-add { background-color: #7f8c8d; margin-bottom: 10px; }
+        .btn-add:hover { background-color: #95a5a6; }
+        .btn-delete { background-color: #e74c3c; width: auto; padding: 8px 12px; }
+        .btn-delete:hover { background-color: #c0392b; }
+        
+        .btn-excel { background-color: #27ae60; font-size: 16px; padding: 15px; margin-top: 10px; display: block; width: 100%; text-align: center; }
+        .btn-excel:hover { background-color: #219653; }
+
+        .results-container { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        
+        /* Bloques de resultados */
+        .tech-box { background: #ebf5fb; padding: 20px; border-radius: 8px; border-left: 5px solid #2980b9; }
+        .cost-box { background: #eafaf1; padding: 20px; border-radius: 8px; border-left: 5px solid #2ecc71; }
+        
+        /* Semáforo de Balance (Alertas Visuales) */
+        .status-pill { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 10px; color: white; }
+        .status-ok { background-color: #2ecc71; }
+        .status-warning { background-color: #f1c40f; color: #2c3e50; }
+        .status-alert { background-color: #e74c3c; }
+
+        /* Formulario del Creador de Ingredientes */
+        .creator-box { background: #fdf2e9; padding: 20px; border-radius: 8px; border-left: 5px solid #e67e22; margin-top: 25px; }
+        .creator-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .creator-form div { display: flex; flex-direction: column; }
+        .creator-form label { font-size: 12px; font-weight: bold; margin-bottom: 3px; color: #d35400; }
+        .creator-form input { padding: 6px; }
+        .creator-full { grid-column: span 3; }
+
+        /* Mensaje de guardado */
+        .save-indicator { font-size: 13px; color: #27ae60; font-weight: bold; margin-top: 5px; text-align: right; display: none; }
+
+        /* Estilos de la Etiqueta Nutricional */
+        .nutri-label { background: #ffffff; padding: 20px; border: 2px solid #000; font-family: Arial, sans-serif; color: #000; }
+        .nutri-label h3 { border-bottom: 8px solid #000; margin: 0 0 5px 0; font-size: 24px; font-weight: bold; }
+        .nutri-header { font-size: 14px; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+        .nutri-header input { width: 80px; display: inline-block; padding: 4px; font-weight: bold; text-align: center; }
+        
+        .nutri-row { display: grid; grid-template-columns: 2fr 1fr 1fr; border-bottom: 1px solid #ccc; padding: 5px 0; font-size: 14px; }
+        .nutri-row span:nth-child(2), .nutri-row span:nth-child(3) { text-align: right; }
+        .nutri-row.indent { padding-left: 15px; font-size: 13px; color: #555; }
+        .nutri-row.bold { font-weight: bold; }
+        .nutri-row.double-border { border-bottom: 4px solid #000; }
+        .badge { font-weight: bold; color: #2980b9; font-size: 1.1em; }
+        .badge-cost { font-weight: bold; color: #27ae60; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Formulador de Helados con Escalado y Semáforo de Balance</h1>
+    <p>Calcula balance, costos, escala recetas a cualquier volumen, añade ingredientes personalizados y exporta a Excel.</p>
+    <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 25px;">
+
+    <div class="grid">
+        <div>
+            <div style="background-color: #fcfcfc; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                <div style="flex: 1;">
+                    <strong style="color: #2980b9;">⚖️ Escalador de Producción:</strong><br>
+                    <span style="font-size: 12px; color: #7f8c8d;">¿Cuánta mezcla líquida quieres preparar hoy en total?</span>
+                </div>
+                <div style="width: 250px; display: flex; align-items: center; gap: 10px;">
+                    <input type="number" id="input-lote-deseado" value="1000" min="1" placeholder="Ej: 5000" style="text-align: right; font-weight: bold;" oninput="calcularTodo()">
+                    <strong>g</strong>
+                </div>
+            </div>
+
+            <h2>Ingredientes de la Receta</h2>
+            <table id="tabla-receta">
+                <thead>
+                    <tr>
+                        <th style="width: 35%;">Ingrediente</th>
+                        <th style="width: 15%;">Base (g)</th>
+                        <th style="width: 15%; background-color: #2980b9; color: white;">Pesar (g)</th>
+                        <th style="width: 20%;">Costo ($/kg)</th>
+                        <th style="width: 15%;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+            <button type="button" class="btn-add" onclick="agregarFila()">+ Añadir Ingrediente</button>
+            <button type="button" style="background-color: #2980b9; font-size: 16px; padding: 15px;" onclick="calcularTodo()">⚡ Calcular Mezcla y Costos</button>
+            <button type="button" class="btn-excel" onclick="exportarAExcel()">📥 Descargar Reporte en Excel (.xlsx)</button>
+            <div id="save-indicator" class="save-indicator">💾 ¡Progreso guardado automáticamente en este navegador!</div>
+
+            <div class="creator-box">
+                <h3 style="color: #e67e22; display: flex; align-items: center; gap: 5px;">➕ Creador de Ingredientes Personalizados</h3>
+                <p style="font-size: 12px; color: #7f8c8d; margin-top: -5px;">Ingresa una materia prima nueva y se agregará inmediatamente a tus opciones sin abrir el bloc de notas.</p>
+                
+                <form id="ingrediente-form" onsubmit="guardarNuevoIngrediente(event)">
+                    <div class="creator-form">
+                        <div class="creator-full">
+                            <label>Nombre de la Materia Prima (Ej: Pasta de Maní Especial)</label>
+                            <input type="text" id="nuevo-nombre" required placeholder="Nombre descriptivo">
+                        </div>
+                        <div>
+                            <label>Costo ($/kg)</label>
+                            <input type="number" id="nuevo-costo" step="0.01" value="5000" required>
+                        </div>
+                        <div>
+                            <label>Sólidos Totales (%)</label>
+                            <input type="number" id="nuevo-solidos" step="0.1" value="100" required>
+                        </div>
+                        <div>
+                            <label>POD (Dulzor)</label>
+                            <input type="number" id="nuevo-pod" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>PAC (Anticongelante)</label>
+                            <input type="number" id="nuevo-pac" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Energía (kcal)</label>
+                            <input type="number" id="nuevo-cal" value="0" required>
+                        </div>
+                        <div>
+                            <label>Proteínas (g)</label>
+                            <input type="number" id="nuevo-prot" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Grasas Totales (g)</label>
+                            <input type="number" id="nuevo-grasa" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Grasas Sat. (g)</label>
+                            <input type="number" id="nuevo-sat" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Grasas Mono. (g)</label>
+                            <input type="number" id="nuevo-mono" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Grasas Poly. (g)</label>
+                            <input type="number" id="nuevo-poly" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Grasas Trans (g)</label>
+                            <input type="number" id="nuevo-trans" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Colesterol (mg)</label>
+                            <input type="number" id="nuevo-chol" value="0" required>
+                        </div>
+                        <div>
+                            <label>Sodio (mg)</label>
+                            <input type="number" id="nuevo-sodio" value="0" required>
+                        </div>
+                        <div>
+                            <label>Carbohidratos (g)</label>
+                            <input type="number" id="nuevo-carb" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Azúcares Totales (g)</label>
+                            <input type="number" id="nuevo-azucar" step="0.1" value="0" required>
+                        </div>
+                        <div>
+                            <label>Fibra Dietética (g)</label>
+                            <input type="number" id="nuevo-fibra" step="0.1" value="0" required>
+                        </div>
+                        <div class="creator-full" style="margin-top: 10px;">
+                            <button type="submit" style="background-color: #e67e22;">💾 Registrar Ingrediente Nuevo</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="results-container">
+            <div class="cost-box">
+                <h3 style="color: #27ae60; margin-bottom: 15px;">💰 Análisis de Costos</h3>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>Costo Total del Batch original:</strong> 
+                    <span class="badge-cost">$ <span id="res-costo-batch">0.00</span></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>Costo por Kilogramo (kg):</strong> 
+                    <span class="badge-cost">$ <span id="res-costo-kg">0.00</span></span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px dashed #2ecc71;">
+                    <strong>Costo del Lote Escalamiento (<span id="lbl-peso-escalado">1000</span>g):</strong> 
+                    <span class="badge-cost" style="color: #16a085;">$ <span id="res-costo-escalado">0.00</span></span>
+                </div>
+            </div>
+
+            <div class="tech-box">
+                <h3 style="color: #2980b9; margin-bottom: 15px;">⚖️ Balance de la Mezcla</h3>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>Peso Original Recipe:</strong> 
+                    <span><span id="res-peso" class="badge">0</span> g</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>Sólidos Totales:</strong> 
+                    <div>
+                        <span id="res-solidos" class="badge">0</span> %
+                        <span id="status-solidos" class="status-pill"></span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <strong>POD (Poder Edulcorante):</strong> 
+                    <div>
+                        <span id="res-pod" class="badge">0</span>
+                        <span id="status-pod" class="status-pill"></span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <strong>PAC (Poder Anticongelante):</strong> 
+                    <div>
+                        <span id="res-pac" class="badge">0</span>
+                        <span id="status-pac" class="status-pill"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="nutri-label">
+                <h3>Información Nutricional</h3>
+                <div class="nutri-header">
+                    Ajustar peso de porción para cálculo: 
+                    <input type="number" id="input-porcion" value="150" min="1" oninput="calcularTodo()"> <strong>g</strong>
+                </div>
+                
+                <div class="nutri-row bold" style="border-bottom: 2px solid #000; font-size: 12px; text-transform: uppercase;">
+                    <span>Nutriente</span>
+                    <span>Por 100g</span>
+                    <span>Por Porción (<span id="lbl-porcion">150</span>g)</span>
+                </div>
+
+                <div class="nutri-row bold">
+                    <span>Energía / Valor Energético</span>
+                    <span><span id="nut-cal">0</span> kcal</span>
+                    <span><span id="nut-cal-p">0</span> kcal</span>
+                </div>
+
+                <div class="nutri-row bold double-border">
+                    <span>Proteínas</span>
+                    <span><span id="nut-prot">0.0</span> g</span>
+                    <span><span id="nut-prot-p">0.0</span> g</span>
+                </div>
+
+                <div class="nutri-row bold">
+                    <span>Grasas Totales</span>
+                    <span><span id="nut-grasas">0.0</span> g</span>
+                    <span><span id="nut-grasas-p">0.0</span> g</span>
+                </div>
+                <div class="nutri-row indent">
+                    <span>Grasas Saturadas</span>
+                    <span><span id="nut-sat">0.0</span> g</span>
+                    <span><span id="nut-sat-p">0.0</span> g</span>
+                </div>
+                <div class="nutri-row indent">
+                    <span>Grasas Monoinsaturadas</span>
+                    <span><span id="nut-mono">0.0</span> g</span>
+                    <span><span id="nut-mono-p">0.0</span> g</span>
+                </div>
+                <div class="nutri-row indent">
+                    <span>Grasas Poliinsaturadas</span>
+                    <span><span id="nut-poly">0.0</span> g</span>
+                    <span><span id="nut-poly-p">0.0</span> g</span>
+                </div>
+                <div class="nutri-row indent">
+                    <span>Grasas Trans</span>
+                    <span><span id="nut-trans">0.0</span> g</span>
+                    <span><span id="nut-trans-p">0.0</span> g</span>
+                </div>
+
+                <div class="nutri-row bold">
+                    <span>Colesterol</span>
+                    <span><span id="nut-chol">0.0</span> mg</span>
+                    <span><span id="nut-chol-p">0.0</span> mg</span>
+                </div>
+
+                <div class="nutri-row bold">
+                    <span>Sodio</span>
+                    <span><span id="nut-sodio">0.0</span> mg</span>
+                    <span><span id="nut-sodio-p">0.0</span> mg</span>
+                </div>
+
+                <div class="nutri-row bold">
+                    <span>Hidratos de Carbono</span>
+                    <span><span id="nut-carbs">0.0</span> g</span>
+                    <span><span id="nut-carbs-p">0.0</span> g</span>
+                </div>
+                <div class="nutri-row indent">
+                    <span>Azúcares Totales</span>
+                    <span><span id="nut-azucares">0.0</span> g</span>
+                    <span><span id="nut-azucares-p">0.0</span> g</span>
+                </div>
+
+                <div class="nutri-row bold" style="border-bottom: 4px solid #000;">
+                    <span>Fibra Dietética</span>
+                    <span><span id="nut-fibra">0.0</span> g</span>
+                    <span><span id="nut-fibra-p">0.0</span> g</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Base de datos de ingredientes con los precios e ingredientes que modificaste manualmente
+const baseDatosPredeterminada = {
+    "leche_entera en polvo": {
+        nombre: "Leche Entera en polvo (primec)", precioKg: 3850, solidos: 12.5, pod: 0, pac: 11,
+        cal: 499, grasa: 26, sat: 16, mono: 6, poly: 2.1, trans: 1.5, chol: 52, carb: 40, azucar: 40, fibra: 0, sodio: 400, prot: 25
+    },
+    "Azucar granulada": {
+        nombre: "Azcuar granulada (4M)", precioKg: 950, solidos: 41.5, pod: 0, pac: 6,
+        cal: 387, grasa: 0.0, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0.0, carb: 99.5, azucar: 99.5, fibra: 0, sodio: 0.04, prot: 0.0
+    },
+    "leche descremada en polvo": {
+        nombre: "Leche descremada en polvo (primec)", precioKg: 3750, solidos: 96.0, pod: 0, pac: 74,
+        cal: 362, grasa: 1.2, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0.0, carb: 52, azucar: 52, fibra: 0, sodio: 535, prot: 34.0
+    },
+    "Maltodextrina 19-20": {
+        nombre: "Maltodextrina 20DE (Tecnarome)", precioKg: 850.00, solidos: 100.0, pod: 100, pac: 100,
+        cal: 418.75, grasa: 0.15, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 92.75, azucar: 0, fibra: 0, sodio: 0, prot: 0.5
+    },
+    "dextrosa": {
+        nombre: "Dextrosa (quimatic)", precioKg: 870.00, solidos: 92.0, pod: 70, pac: 190,
+        cal: 366, grasa: 0.0, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 91.3, azucar: 0, fibra: 0, sodio: 2, prot: 0.1
+    },
+    "cacao 12%": {
+        nombre: "Cacao 12% (Barry callebaut)", precioKg: 22000.00, solidos: 95.0, pod: 0, pac: 0,
+        cal: 331, grasa: 11, sat: 6.6, mono: 3.6, poly: 0.3, trans: 0.0, chol: 0, carb: 20.5, azucar: 0.5, fibra: 30, sodio: 12.7, prot: 24
+    },
+    "Inulina": {
+        nombre: "Inulina (Food pst)", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 207, grasa: 0.0, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 95.8, azucar: 7.7, fibra: 88.1, sodio: 50, prot: 0
+    },
+    "Estabilizante quasaemul 4708": {
+        nombre: "Estabilizante quasaemul 4708 (quimatic)", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 680, grasa: 70, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 22.6, azucar: 12.1, fibra: 12, sodio: 1056, prot: 0.7
+    },
+    "Pasta pistacho": {
+        nombre: "Pasta pistacho (sicilia (Fiorentini))", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 631, grasa: 56.1, sat: 5.6, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 8.1, azucar: 4.5, fibra: 10.6, sodio: 0, prot: 18.1
+    },
+    "Pasta vainilla": {
+        nombre: "Pasta vainilla (tahiti (montebianco))", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 270.4, grasa: 0.1, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 66.4, azucar: 49.4, fibra: 1.4, sodio: 0, prot: 0.2
+    },
+    "Leche en polvo semidescremada sin lactosa": {
+        nombre: "Leche en polvo semidescremada sin lactosa (loncoleche)", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 371, grasa: 3.5, sat: 2.2, mono: 1.2, poly: 0.1, trans: 0.1, chol: 16.8, carb: 59.6, azucar: 36.5, fibra: 0, sodio: 475, prot: 25.2
+    },
+    "Acido citrico": {
+        nombre: "Acido citrico (quimatic)", precioKg: 5500.00, solidos: 50.0, pod: 0, pac: 3,
+        cal: 200, grasa: 0.0, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 0.1, azucar: 0, fibra: 0.1, sodio: 23480, prot: 0
+    },
+    "Crema leche": {
+        nombre: "Crema leche (33% MG)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 317, grasa: 33, sat: 21.12, mono: 9.60, poly: 0.83, trans: 1.42, chol: 106, carb: 4.9, azucar: 2.9, fibra: 0, sodio: 29, prot: 2
+    },
+    "Cacao 22%": {
+        nombre: "Cacao 22% (Barry callebaut)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 389, grasa: 23, sat: 13.8, mono: 7.5, poly: 0.7, trans: 0.0, chol: 0, carb: 9.1, azucar: 0.4, fibra: 29.8, sodio: 0, prot: 19.5
+    },
+    "Albumina de huevo": {
+        nombre: "Albumina de huevo (AB Brasil)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 312, grasa: 0, sat: 0, mono: 0, poly: 0, trans: 0, chol: 0, carb: 0, azucar: 0, fibra: 0, sodio: 0, prot: 78
+    },
+    "Polidextrosa": {
+        nombre: "Polidextrosa (Nutrial)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 186, grasa: 0, sat: 0, mono: 0, poly: 0, trans: 0, chol: 0, carb: 3.5, azucar: 0, fibra: 92.8, sodio: 0, prot: 0
+    },
+    "Alulosa": {
+        nombre: "Alulosa (Dimerco)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 45, grasa: 0, sat: 0, mono: 0, poly: 0, trans: 0, chol: 0, carb: 98.5, azucar: 0, fibra: 0, sodio: 0, prot: 0
+    },
+    "Goma tara": {
+        nombre: "Goma tara (blumos)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 359.68, grasa: 0.58, sat: 0, mono: 0, poly: 0, trans: 0, chol: 0, carb: 86.68, azucar: 0, fibra: 82, sodio: 0.23, prot: 2.5
+    },
+    "PGX-1": {
+        nombre: "PGX-1 (Danisco)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 517, grasa: 50, sat: 46, mono: 0, poly: 0, trans: 0.56, chol: 0, carb: 43, azucar: 2, fibra: 28, sodio: 614, prot: 2
+    },
+    "Pasta mandarinetto": {
+        nombre: "Pasta mandarinetto (Disaronno)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 281.5, grasa: 0.1, sat: 0, mono: 0, poly: 0, trans: 0, chol: 0, carb: 69.6, azucar: 0, fibra: 0.4, sodio: 14.3, prot: 0.2
+    },
+    "Pasta Mascarpone": {
+        nombre: "Pasta mascarpone (Disaronno)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 448.7, grasa: 18, sat: 10.8, mono: 4.9, poly: 0.5, trans: 0.5, chol: 56.7, carb: 61.8, azucar: 0, fibra: 0, sodio: 329.3, prot: 9.9
+    },
+    "Pasta malaga": {
+        nombre: "Pasta malaga (Pregel)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 284, grasa: 0.4, sat: 0.3, mono: 0, poly: 0, trans: 0, chol: 0, carb: 59.8, azucar: 47.9, fibra: 0, sodio: 0.07, prot: 0.9
+    },
+    "Pasta tiramisu": {
+        nombre: "Pasta tiramisu (Montebianco)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 324, grasa: 2.2, sat: 0.8, mono: 0, poly: 0, trans: 0, chol: 0, carb: 57.9, azucar: 48.3, fibra: 0, sodio: 58.73, prot: 3.2
+    },
+    "Pasta de avellana": {
+        nombre: "Pasta avellana (la campana)", precioKg: 8000.00, solidos: 84.0, pod: 0, pac: 0,
+        cal: 666, grasa: 56.60, sat: 4.10, mono: 43.30, poly: 9.20, trans: 0.10, chol: 0, carb: 22.40, azucar: 4.2, fibra: 2, sodio: 5, prot: 16.8
+    },
+    "agua": {
+        nombre: "Agua", precioKg: 0.00, solidos: 0.0, pod: 0, pac: 0,
+        cal: 0, grasa: 0.0, sat: 0.0, mono: 0.0, poly: 0.0, trans: 0.0, chol: 0, carb: 0.0, azucar: 0.0, fibra: 0, sodio: 0, prot: 0.0
+    }
+};
+
+let baseDatos = {};
+
+function inicializarBaseDatos() {
+    const personalizados = localStorage.getItem("ingredientes_personalizados");
+    let bdPers = personalizados ? JSON.parse(personalizados) : {};
+    baseDatos = { ...baseDatosPredeterminada, ...bdPers };
+}
+
+function guardarNuevoIngrediente(event) {
+    event.preventDefault();
+    const nombre = document.getElementById("nuevo-nombre").value;
+    const idKey = nombre.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+
+    if (baseDatos[idKey]) {
+        alert("Ya existe un ingrediente con un nombre muy similar.");
+        return;
+    }
+
+    const nuevoIng = {
+        nombre: nombre,
+        precioKg: parseFloat(document.getElementById("nuevo-costo").value) || 0,
+        solidos: parseFloat(document.getElementById("nuevo-solidos").value) || 0,
+        pod: parseFloat(document.getElementById("nuevo-pod").value) || 0,
+        pac: parseFloat(document.getElementById("nuevo-pac").value) || 0,
+        cal: parseFloat(document.getElementById("nuevo-cal").value) || 0,
+        prot: parseFloat(document.getElementById("nuevo-prot").value) || 0,
+        grasa: parseFloat(document.getElementById("nuevo-grasa").value) || 0,
+        sat: parseFloat(document.getElementById("nuevo-sat").value) || 0,
+        mono: parseFloat(document.getElementById("nuevo-mono").value) || 0,
+        poly: parseFloat(document.getElementById("nuevo-poly").value) || 0,
+        trans: parseFloat(document.getElementById("nuevo-trans").value) || 0,
+        chol: parseFloat(document.getElementById("nuevo-chol").value) || 0,
+        sodio: parseFloat(document.getElementById("nuevo-sodio").value) || 0,
+        carb: parseFloat(document.getElementById("nuevo-carb").value) || 0,
+        azucar: parseFloat(document.getElementById("nuevo-azucar").value) || 0,
+        fibra: parseFloat(document.getElementById("nuevo-fibra").value) || 0
+    };
+
+    const personalizados = localStorage.getItem("ingredientes_personalizados");
+    let bdPers = personalizados ? JSON.parse(personalizados) : {};
+    bdPers[idKey] = nuevoIng;
+    localStorage.setItem("ingredientes_personalizados", JSON.stringify(bdPers));
+
+    alert("¡Ingrediente guardado con éxito! Ahora puedes seleccionarlo en la tabla.");
+    document.getElementById("ingrediente-form").reset();
+    
+    recargarListasDesplegables(idKey);
+}
+
+function recargarListasDesplegables(nuevaClaveSeleccionada = "") {
+    inicializarBaseDatos();
+    const selects = document.querySelectorAll(".ingrediente-select");
+    selects.forEach(select => {
+        const valorActual = select.value;
+        select.innerHTML = "";
+        for (let clave in baseDatos) {
+            let opt = document.createElement("option");
+            opt.value = clave;
+            opt.innerText = baseDatos[clave].nombre;
+            select.appendChild(opt);
+        }
+        select.value = valorActual;
+    });
+}
+
+function agregarFila(ingredienteDefecto = "", cantidadDefecto = "", precioDefecto = null) {
+    const tbody = document.querySelector("#tabla-receta tbody");
+    const tr = document.createElement("tr");
+
+    let opciones = "";
+    for (let clave in baseDatos) {
+        let sel = clave === ingredienteDefecto ? "selected" : "";
+        opciones += `<option value="${clave}" ${sel}>${baseDatos[clave].nombre}</option>`;
+    }
+
+    let precioInicial = precioDefecto !== null ? precioDefecto : (ingredienteDefecto ? baseDatos[ingredienteDefecto].precioKg : 0);
+
+    tr.innerHTML = `
+        <td><select class="ingrediente-select" onchange="actualizarPrecioSugerido(this)">${opciones}</select></td>
+        <td><input type="number" class="cantidad-input" value="${cantidadDefecto}" placeholder="Gramos" min="0" oninput="calcularTodo()"></td>
+        <td><input type="text" class="cantidad-escalada-input" value="-" style="background-color: #ebf5fb; font-weight: bold; text-align: center;" readonly></td>
+        <td><input type="number" class="precio-input" value="${precioInicial}" step="0.01" placeholder="Precio por Kg" min="0" oninput="calcularTodo()"></td>
+        <td><button type="button" class="btn-delete" onclick="eliminarFila(this)">X</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function actualizarPrecioSugerido(selectElement) {
+    const fila = selectElement.closest("tr");
+    const idIngrediente = selectElement.value;
+    const inputPrecio = fila.querySelector(".precio-input");
+    inputPrecio.value = baseDatos[idIngrediente].precioKg;
+    calcularTodo();
+}
+
+function eliminarFila(boton) {
+    boton.closest("tr").remove();
+    calcularTodo();
+}
+
+let ultimosResultados = {};
+
+function calcularTodo() {
+    const filas = document.querySelectorAll("#tabla-receta tbody tr");
+    const tamanoPorcion = parseFloat(document.getElementById("input-porcion").value) || 100;
+    const pesoLoteDeseado = parseFloat(document.getElementById("input-lote-deseado").value) || 0;
+    document.getElementById("lbl-porcion").innerText = tamanoPorcion;
+    document.getElementById("lbl-peso-escalado").innerText = pesoLoteDeseado;
+    
+    let pesoTotal = 0;
+    let costoTotalCalculado = 0;
+    let solidosTotalesGramos = 0;
+    let podTotalPonderado = 0;
+    let pacTotalPonderado = 0;
+    
+    let kcalAcum = 0;
+    let protAcum = 0;
+    let grasaAcum = 0;
+    let satAcum = 0;
+    let monoAcum = 0;
+    let polyAcum = 0;
+    let transAcum = 0;
+    let cholAcum = 0;
+    let carbAcum = 0;
+    let azucarAcum = 0;
+    let fibraAcum = 0;
+    let sodioAcum = 0;
+
+    let datosAGuardar = [];
+
+    filas.forEach(fila => {
+        const idIngrediente = fila.querySelector(".ingrediente-select").value;
+        const cantidad = parseFloat(fila.querySelector(".cantidad-input").value) || 0;
+        const precioKg = parseFloat(fila.querySelector(".precio-input").value) || 0;
+        
+        datosAGuardar.push({
+            id: idIngrediente,
+            cant: cantidad,
+            precio: precioKg
+        });
+
+        if (cantidad > 0) {
+            pesoTotal += cantidad;
+        }
+    });
+
+    if (pesoTotal === 0) {
+        filas.forEach(fila => {
+            fila.querySelector(".cantidad-escalada-input").value = "-";
+        });
+        return;
+    }
+
+    localStorage.setItem("receta_guardada", JSON.stringify(datosAGuardar));
+    localStorage.setItem("porcion_guardada", tamanoPorcion);
+    localStorage.setItem("lote_deseado_guardado", pesoLoteDeseado);
+    
+    const indicador = document.getElementById("save-indicator");
+    indicador.style.display = "block";
+    setTimeout(() => { indicador.style.display = "none"; }, 2500);
+
+    let factorEscalado = pesoLoteDeseado / pesoTotal;
+    let desgloseIngredientesExcel = [];
+    let costoLoteEscaladoTotal = 0;
+
+    filas.forEach(fila => {
+        const idIngrediente = fila.querySelector(".ingrediente-select").value;
+        const nombreIng = baseDatos[idIngrediente].nombre;
+        const cantidad = parseFloat(fila.querySelector(".cantidad-input").value) || 0;
+        const precioKg = parseFloat(fila.querySelector(".precio-input").value) || 0;
+        
+        let pesoEscalado = cantidad * factorEscalado;
+        let inputEscalado = fila.querySelector(".cantidad-escalada-input");
+        inputEscalado.value = pesoEscalado.toFixed(1);
+
+        if (cantidad > 0) {
+            const ing = baseDatos[idIngrediente];
+            const costoFila = (cantidad / 1000) * precioKg;
+            const costoFilaEscalado = (pesoEscalado / 1000) * precioKg;
+            
+            costoTotalCalculado += costoFila;
+            costoLoteEscaladoTotal += costoFilaEscalado;
+            
+            desgloseIngredientesExcel.push({
+                "Ingrediente": nombreIng,
+                "Base (g)": cantidad,
+                "Pesar para Lote (g)": parseFloat(pesoEscalado.toFixed(1)),
+                "Precio ($/kg)": precioKg,
+                "Costo de Mezcla Base ($)": parseFloat(costoFila.toFixed(2))
+            });
+
+            solidosTotalesGramos += (cantidad * ing.solidos) / 100;
+            podTotalPonderado += (cantidad * ing.pod) / 100;
+            pacTotalPonderado += (cantidad * ing.pac) / 100;
+            
+            kcalAcum += (cantidad * ing.cal) / 100;
+            grasaAcum += (cantidad * ing.grasa) / 100;
+            satAcum += (cantidad * ing.sat) / 100;
+            monoAcum += (cantidad * ing.mono) / 100;
+            polyAcum += (cantidad * ing.poly) / 100;
+            transAcum += (cantidad * ing.trans) / 100;
+            cholAcum += (cantidad * ing.chol) / 100;
+            carbAcum += (cantidad * ing.carb) / 100;
+            azucarAcum += (cantidad * ing.azucar) / 100;
+            fibraAcum += (cantidad * ing.fibra) / 100;
+            protAcum += (cantidad * ing.prot) / 100;
+            sodioAcum += (cantidad * ing.sodio) / 100;
+        }
+    });
+
+    let costoPorKg = (costoTotalCalculado / (pesoTotal / 1000));
+    document.getElementById("res-costo-batch").innerText = costoTotalCalculado.toFixed(2);
+    document.getElementById("res-costo-kg").innerText = costoPorKg.toFixed(2);
+    document.getElementById("res-costo-escalado").innerText = costoLoteEscaladoTotal.toFixed(2);
+
+    let pctSolidos = (solidosTotalesGramos / pesoTotal) * 100;
+    let podMix = (podTotalPonderado / pesoTotal) * 100;
+    let pacMix = (pacTotalPonderado / pesoTotal) * 100;
+
+    document.getElementById("res-peso").innerText = pesoTotal.toFixed(1);
+    document.getElementById("res-solidos").innerText = pctSolidos.toFixed(2);
+    document.getElementById("res-pod").innerText = podMix.toFixed(1);
+    document.getElementById("res-pac").innerText = pacMix.toFixed(1);
+
+    const stPill = document.getElementById("status-solidos");
+    if (pctSolidos >= 36 && pctSolidos <= 40) {
+        stPill.className = "status-pill status-ok";
+        stPill.innerText = "ÓPTIMO";
+    } else if (pctSolidos >= 34 && pctSolidos <= 42) {
+        stPill.className = "status-pill status-warning";
+        stPill.innerText = "ACEPTABLE";
+    } else {
+        stPill.className = "status-pill status-alert";
+        stPill.innerText = "AJUSTAR";
+    }
+
+    const podPill = document.getElementById("status-pod");
+    if (podMix >= 16 && podMix <= 22) {
+        podPill.className = "status-pill status-ok";
+        podPill.innerText = "ÓPTIMO";
+    } else if (podMix >= 14 && podMix <= 24) {
+        podPill.className = "status-pill status-warning";
+        podPill.innerText = "ACEPTABLE";
+    } else {
+        podPill.className = "status-pill status-alert";
+        podPill.innerText = "AJUSTAR";
+    }
+
+    const pacPill = document.getElementById("status-pac");
+    if (pacMix >= 240 && pacMix <= 300) {
+        pacPill.className = "status-pill status-ok";
+        pacPill.innerText = "ÓPTIMO";
+    } else if (pacMix >= 220 && pacMix <= 320) {
+        pacPill.className = "status-pill status-warning";
+        pacPill.innerText = "ACEPTABLE";
+    } else {
+        pacPill.className = "status-pill status-alert";
+        pacPill.innerText = "AJUSTAR";
+    }
+
+    function actualizarValores(idBase, totalAcumulado, decimales = 1) {
+        let valor100g = (totalAcumulado / pesoTotal) * 100;
+        let valorPorcion = valor100g * (tamanoPorcion / 100);
+        
+        document.getElementById(idBase).innerText = valor100g.toFixed(decimales);
+        document.getElementById(idBase + "-p").innerText = valorPorcion.toFixed(decimales);
+        
+        return { g100: parseFloat(valor100g.toFixed(decimales)), porc: parseFloat(valorPorcion.toFixed(decimales)) };
+    }
+
+    let cal100g = (kcalAcum / pesoTotal) * 100;
+    let calPorc = cal100g * (tamanoPorcion / 100);
+    document.getElementById("nut-cal").innerText = Math.round(cal100g);
+    document.getElementById("nut-cal-p").innerText = Math.round(calPorc);
+
+    ultimosResultados = {
+        ingredientes: desgloseIngredientesExcel,
+        resumen: {
+            "Peso Original Recipe (g)": pesoTotal,
+            "Lote Deseado Escalado (g)": pesoLoteDeseado,
+            "Costo Total Batch ($)": parseFloat(costoTotalCalculado.toFixed(2)),
+            "Costo Lote Escalado ($)": parseFloat(costoLoteEscaladoTotal.toFixed(2)),
+            "Costo por Kilogramo ($/kg)": parseFloat(costoPorKg.toFixed(2)),
+            "Sólidos Totales (%)": parseFloat(pctSolidos.toFixed(2)),
+            "POD": parseFloat(podMix.toFixed(1)),
+            "PAC": parseFloat(pacMix.toFixed(1))
+        },
+        nutricional: [
+            { "Nutriente": "Energía (kcal)", "Por 100g": Math.round(cal100g), "Por Porción": Math.round(calPorc) },
+            { "Nutriente": "Proteínas (g)", ...actualizarValores("nut-prot", protAcum) },
+            { "Nutriente": "Grasas Totales (g)", ...actualizarValores("nut-grasas", grasaAcum) },
+            { "Nutriente": "  Grasas Saturadas (g)", ...actualizarValores("nut-sat", satAcum) },
+            { "Nutriente": "  Grasas Monoinsaturadas (g)", ...actualizarValores("nut-mono", monoAcum) },
+            { "Nutriente": "  Grasas Poliinsaturadas (g)", ...actualizarValores("nut-poly", polyAcum) },
+            { "Nutriente": "  Grasas Trans (g)", ...actualizarValores("nut-trans", transAcum) },
+            { "Nutriente": "Colesterol (mg)", ...actualizarValores("nut-chol", cholAcum) },
+            { "Nutriente": "Sodio (mg)", ...actualizarValores("nut-sodio", sodioAcum) },
+            { "Nutriente": "Hidratos de Carbono (g)", ...actualizarValores("nut-carbs", carbAcum) },
+            { "Nutriente": "  Azúcares Totales (g)", ...actualizarValores("nut-azucares", azucarAcum) },
+            { "Nutriente": "Fibra Dietética (g)", ...actualizarValores("nut-fibra", fibraAcum) }
+        ],
+        porcion: tamanoPorcion
+    };
+}
+
+function cargarDatosGuardados() {
+    inicializarBaseDatos();
+    const recetaGuardada = localStorage.getItem("receta_guardada");
+    const porcionGuardada = localStorage.getItem("porcion_guardada");
+    const loteDeseadoGuardado = localStorage.getItem("lote_deseado_guardado");
+    const tbody = document.querySelector("#tabla-receta tbody");
+    
+    tbody.innerHTML = "";
+
+    if (recetaGuardada) {
+        const filasObj = JSON.parse(recetaGuardada);
+        filasObj.forEach(fila => {
+            agregarFila(fila.id, fila.cant === 0 ? "" : fila.cant, fila.precio);
+        });
+        
+        if (porcionGuardada) {
+            document.getElementById("input-porcion").value = porcionGuardada;
+        }
+        if (loteDeseadoGuardado) {
+            document.getElementById("input-lote-deseado").value = loteDeseadoGuardado;
+        }
+    } else {
+        // Receta base sugerida al iniciar sin almacenamiento previo
+        agregarFila("leche_entera en polvo", 100);
+        agregarFila("Azucar granulada", 130);
+        agregarFila("dextrosa", 30);
+        agregarFila("Estabilizante quasaemul 4708", 5);
+        agregarFila("agua", 735);
+    }
+    
+    calcularTodo();
+}
+
+function exportarAExcel() {
+    if (!ultimosResultados.resumen) {
+        alert("Primero debes calcular la receta antes de exportar.");
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // 1. Hoja de Receta y Costos
+    const datosReceta = ultimosResultados.ingredientes.map(ing => ({
+        "Ingrediente": ing["Ingrediente"],
+        "Cantidad Base (g)": ing["Base (g)"],
+        "Pesar para Lote (g)": ing["Pesar para Lote (g)"],
+        "Precio sugerido ($/kg)": ing["Precio ($/kg)"],
+        "Costo ingrediente ($)": ing["Costo de Mezcla Base ($)"]
+    }));
+    const wsReceta = XLSX.utils.json_to_sheet(datosReceta);
+
+    // 2. Hoja de Balance Técnico
+    const balanceArray = [
+        ["Parámetro de Balance", "Valor Obtenido", "Unidad/Referencia"],
+        ["Peso Base Receta", ultimosResultados.resumen["Peso Original Recipe (g)"], "g"],
+        ["Lote de Producción Solicitado", ultimosResultados.resumen["Lote Deseado Escalado (g)"], "g"],
+        ["Sólidos Totales", ultimosResultados.resumen["Sólidos Totales (%)"], "% (Ideal: 36% - 40%)"],
+        ["POD (Poder Edulcorante)", ultimosResultados.resumen["POD"], "Ratio (Ideal: 16 - 22)"],
+        ["PAC (Poder Anticongelante)", ultimosResultados.resumen["PAC"], "Ratio (Ideal: 240 - 300)"],
+        ["", "", ""],
+        ["💰 RESUMEN ECONÓMICO", "", ""],
+        ["Costo de Mezcla Base", ultimosResultados.resumen["Costo Total Batch ($)"], "$"],
+        ["Costo del Lote Solicitado (" + ultimosResultados.resumen["Lote Deseado Escalado (g)"] + "g)", ultimosResultados.resumen["Costo Lote Escalado ($)"], "$"],
+        ["Costo por Kilogramo (kg)", ultimosResultados.resumen["Costo por Kilogramo ($/kg)"], "$ / kg"]
+    ];
+    const wsBalance = XLSX.utils.aoa_to_sheet(balanceArray);
+
+    // 3. Hoja de Etiqueta Nutricional
+    const nutricionalArray = [
+        ["Información Nutricional", `Porción Evaluada: ${ultimosResultados.porcion} g`, ""],
+        ["Nutriente", "Por cada 100g", `Por Porción (${ultimosResultados.porcion}g)`],
+        ...ultimosResultados.nutricional.map(n => [
+            n["Nutriente"],
+            n.g100 !== undefined ? n.g100 : n["Por 100g"],
+            n.porc !== undefined ? n.porc : n["Por Porción"]
+        ])
+    ];
+    const wsNutri = XLSX.utils.aoa_to_sheet(nutricionalArray);
+
+    XLSX.utils.book_append_sheet(wb, wsReceta, "1. Receta y Costos");
+    XLSX.utils.book_append_sheet(wb, wsBalance, "2. Balance Técnico");
+    XLSX.utils.book_append_sheet(wb, wsNutri, "3. Etiqueta Nutricional");
+
+    XLSX.writeFile(wb, "Reporte_Helado_Calculadora_Completa.xlsx");
+}
+</script>
+</body>
+</html>
